@@ -2,11 +2,11 @@ name: Build & Release
 
 on:
   push:
-  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write # required to create releases / upload assets
+  id-token: write # required for NuGet Trusted Publishing (OIDC)
 
 jobs:
   release:
@@ -80,9 +80,18 @@ jobs:
             "exists=false" >> $env:GITHUB_OUTPUT
           }
 
+      # Exchanges GitHub's OIDC token for a short-lived (1h) nuget.org API key -
+      # no long-lived secret to store or rotate.
+      - name: NuGet login (OIDC -> temp API key)
+        if: steps.ismain.outputs.yes == 'true' && steps.tagcheck.outputs.exists == 'false'
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }} # nuget.org profile name, not email
+
       - name: Push to NuGet
         if: steps.ismain.outputs.yes == 'true' && steps.tagcheck.outputs.exists == 'false'
-        run: dotnet nuget push "artifacts/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: Create Release
         if: steps.ismain.outputs.yes == 'true' && steps.tagcheck.outputs.exists == 'false'
