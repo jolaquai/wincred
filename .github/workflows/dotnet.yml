@@ -20,8 +20,15 @@ jobs:
       with:
         dotnet-version: 11.0.x
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore wincred/wincred.csproj
     - name: Build
-      run: dotnet build --no-restore
+      run: dotnet build wincred/wincred.csproj --no-restore -c Release
     - name: Test
-      run: dotnet test --no-build --verbosity normal
+      run: dotnet test wincred/wincred.csproj --no-build -c Release --verbosity normal
+    - name: Publish
+      run: dotnet publish wincred/wincred.csproj --no-build -c Release -o artifacts
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wincred
+        path: artifacts/wincred.dll
