@@ -54,6 +54,7 @@
       <Compile Remove="**/*.net7.0.cs" />
       <None Include="**/*.net7.0.cs" />
       <PackageReference Include="System.Memory" Version="4.6.3" />
+      <PackageReference Include="Microsoft.Bcl.HashCode" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net7.0-windows' OR '$(TargetFramework)' == 'net8.0-windows'">
       <Compile Remove="**/*.netstandard2.0.cs" />

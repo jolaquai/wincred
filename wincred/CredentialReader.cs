@@ -2,7 +2,9 @@ using wincred.Interop;
 
 namespace wincred;
 
-/// <summary>Zero-copy view over a credential from <see cref="CredentialStore.TryRead"/>. Must be disposed. A <see langword="default"/> instance is unsafe to use.</summary>
+/// <summary>
+/// Zero-copy view over a credential from <see cref="CredentialStore.TryRead"/>. Must be disposed. A <see langword="default"/> instance is unsafe to use.
+/// </summary>
 public unsafe ref struct CredentialReader : IDisposable
 {
     private NativeCredential* _credential;
@@ -17,14 +19,18 @@ public unsafe ref struct CredentialReader : IDisposable
         _owned = owned;
     }
 
-    /// <summary>The decrypted secret blob.</summary>
+    /// <summary>
+    /// The decrypted secret blob.
+    /// </summary>
     public readonly ReadOnlySpan<byte> Secret
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _credential->CredentialBlob is null ? default : new ReadOnlySpan<byte>(_credential->CredentialBlob, (int)_credential->CredentialBlobSize);
     }
 
-    /// <summary>Secret as UTF-16LE text (a plaintext password). Throws <see cref="FormatException"/> if not well-formed UTF-16; use <see cref="UnsafePassword"/> to skip that check.</summary>
+    /// <summary>
+    /// Secret as UTF-16LE text (a plaintext password). Throws <see cref="FormatException"/> if not well-formed UTF-16; use <see cref="UnsafePassword"/> to skip that check.
+    /// </summary>
     public readonly ReadOnlySpan<char> Password
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -46,56 +52,72 @@ public unsafe ref struct CredentialReader : IDisposable
         }
     }
 
-    /// <summary>Secret as UTF-16LE text, unchecked. UB if the secret isn't valid UTF-16.</summary>
+    /// <summary>
+    /// Secret as UTF-16LE text, unchecked. UB if the secret isn't valid UTF-16.
+    /// </summary>
     public readonly ReadOnlySpan<char> UnsafePassword
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => MemoryMarshal.Cast<byte, char>(Secret);
     }
 
-    /// <summary>The credential's type.</summary>
+    /// <summary>
+    /// The credential's type.
+    /// </summary>
     public readonly CredentialType Type
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => (CredentialType)_credential->Type;
     }
 
-    /// <summary>The target name it was stored under.</summary>
+    /// <summary>
+    /// The target name it was stored under.
+    /// </summary>
     public readonly ReadOnlySpan<char> TargetName
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => AsSpan(_credential->TargetName);
     }
 
-    /// <summary>Associated username, if any.</summary>
+    /// <summary>
+    /// Associated username, if any.
+    /// </summary>
     public readonly ReadOnlySpan<char> UserName
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => AsSpan(_credential->UserName);
     }
 
-    /// <summary>Associated comment, if any.</summary>
+    /// <summary>
+    /// Associated comment, if any.
+    /// </summary>
     public readonly ReadOnlySpan<char> Comment
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => AsSpan(_credential->Comment);
     }
 
-    /// <summary>Persistence scope it was written with.</summary>
+    /// <summary>
+    /// Persistence scope it was written with.
+    /// </summary>
     public readonly CredentialPersistence Persistence
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => (CredentialPersistence)_credential->Persist;
     }
 
-    /// <summary>UTC time of last write.</summary>
+    /// <summary>
+    /// UTC time of last write.
+    /// </summary>
     public readonly DateTime LastWritten
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => DateTime.FromFileTimeUtc(_credential->LastWritten);
     }
 
-    /// <summary>Application-defined attributes, if any.</summary>
+    /// <summary>
+    /// Application-defined attributes, if any.
+    /// </summary>
     public readonly CredentialAttributeList Attributes
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -125,7 +147,9 @@ public unsafe ref struct CredentialReader : IDisposable
         return true;
     }
 
-    /// <summary>Releases the buffer backing this reader.</summary>
+    /// <summary>
+    /// Releases the buffer backing this reader.
+    /// </summary>
     public void Dispose()
     {
         if (_owned && _credential is not null)

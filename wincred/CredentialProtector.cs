@@ -7,11 +7,13 @@ namespace wincred;
 /// </summary>
 public static unsafe class CredentialProtector
 {
-    /// <summary>Protects <paramref name="credentials"/> into <paramref name="destination"/>.</summary>
-    /// <param name="credentials">Must not be null or empty.</param>
-    /// <param name="destination">Pass empty to query the required size via <paramref name="charsWritten"/>.</param>
-    /// <param name="charsWritten">Chars written on success; required size on failure, if known.</param>
-    /// <param name="protectionType">Protection actually applied.</param>
+    /// <summary>
+    /// Protects <paramref name="credentials"/> into <paramref name="destination"/>.
+    /// </summary>
+    /// <param name="credentials">The plaintext to protect.</param>
+    /// <param name="destination">Receives the protected text; pass empty to query the required size via <paramref name="charsWritten"/>.</param>
+    /// <param name="charsWritten">Chars written on success; required buffer size on failure, if known.</param>
+    /// <param name="protectionType">The protection actually applied.</param>
     /// <param name="asSelf">False to protect as the thread's impersonated identity instead of the caller.</param>
     /// <returns><see langword="true"/> if protected.</returns>
     public static bool TryProtect(string credentials, Span<char> destination, out int charsWritten, out CredentialProtectionType protectionType, bool asSelf = true)
@@ -34,10 +36,12 @@ public static unsafe class CredentialProtector
         }
     }
 
-    /// <summary>Reverses <see cref="TryProtect"/>.</summary>
-    /// <param name="protectedCredentials">Must not be null or empty.</param>
-    /// <param name="destination">Pass empty to query the required size via <paramref name="charsWritten"/>.</param>
-    /// <param name="charsWritten">Chars written on success; required size on failure, if known.</param>
+    /// <summary>
+    /// Reverses <see cref="TryProtect"/>.
+    /// </summary>
+    /// <param name="protectedCredentials">The protected text, as produced by <see cref="TryProtect"/>.</param>
+    /// <param name="destination">Receives the plaintext; pass empty to query the required size via <paramref name="charsWritten"/>.</param>
+    /// <param name="charsWritten">Chars written on success; required buffer size on failure, if known.</param>
     /// <param name="asSelf">Must match the value used to protect it.</param>
     /// <returns><see langword="true"/> if unprotected.</returns>
     public static bool TryUnprotect(string protectedCredentials, Span<char> destination, out int charsWritten, bool asSelf = true)

@@ -1,5 +1,3 @@
-using System.Collections;
-
 using wincred.Interop;
 
 namespace wincred;

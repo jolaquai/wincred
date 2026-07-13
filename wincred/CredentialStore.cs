@@ -2,35 +2,48 @@ using wincred.Interop;
 
 namespace wincred;
 
-/// <summary>Low-alloc access to the Windows Credential Manager.</summary>
+/// <summary>
+/// Low-alloc access to the Windows Credential Manager.
+/// </summary>
 public static unsafe class CredentialStore
 {
     // CRED_ENUMERATE_ALL_CREDENTIALS
     private const uint EnumerateAllCredentialsFlag = 0x1;
 
-    /// <summary>Max secret blob size, in bytes.</summary>
+    /// <summary>
+    /// Max secret blob size, in bytes.
+    /// </summary>
     public const int MaxSecretSize = 5 * 512;
 
-    /// <summary>Max attributes per credential.</summary>
+    /// <summary>
+    /// Max attributes per credential.
+    /// </summary>
     public const int MaxAttributeCount = 64;
 
-    /// <summary>Max attribute keyword length, in characters.</summary>
+    /// <summary>
+    /// Max attribute keyword length, in characters.
+    /// </summary>
     public const int MaxAttributeKeywordLength = 256;
 
-    /// <summary>Max attribute value size, in bytes.</summary>
+    /// <summary>
+    /// Max attribute value size, in bytes.
+    /// </summary>
     public const int MaxAttributeValueSize = 256;
 
-    /// <summary>Writes (or overwrites) a credential.</summary>
-    /// <param name="target">Must not be null or empty.</param>
-    /// <param name="secret">Max <see cref="MaxSecretSize"/> bytes.</param>
+    /// <summary>
+    /// Writes (or overwrites) a credential.
+    /// </summary>
+    /// <param name="target">The name to store and look the credential up under.</param>
+    /// <param name="secret">The raw secret to store, up to <see cref="MaxSecretSize"/> bytes.</param>
     /// <param name="type"><see cref="CredentialType.DomainCertificate"/>/<see cref="CredentialType.GenericCertificate"/> are rejected by the OS; this just returns <see langword="false"/> for them.</param>
-    /// <param name="userName">Optional.</param>
-    /// <param name="comment">Optional.</param>
-    /// <param name="attributes">Max <see cref="MaxAttributeCount"/> entries.</param>
+    /// <param name="userName">The associated username, if any.</param>
+    /// <param name="comment">A free-text comment, if any.</param>
+    /// <param name="persistence"></param>
+    /// <param name="attributes">Application-defined key/value pairs to attach, up to <see cref="MaxAttributeCount"/> entries.</param>
     /// <returns><see langword="true"/> if written.</returns>
     public static bool TryWrite(string target, ReadOnlySpan<byte> secret, CredentialType type = CredentialType.Generic, string userName = null, string comment = null, CredentialPersistence persistence = CredentialPersistence.LocalMachine, ReadOnlySpan<CredentialAttributeEntry> attributes = default)
     {
-        if (type == CredentialType.DomainCertificate || type == CredentialType.GenericCertificate)
+        if (type is CredentialType.DomainCertificate or CredentialType.GenericCertificate)
         {
             return false;
         }
@@ -124,19 +137,26 @@ public static unsafe class CredentialStore
         }
     }
 
-    /// <summary>Writes (or overwrites) a credential holding a plaintext password.</summary>
-    /// <param name="target">Must not be null or empty.</param>
-    /// <param name="password">Reinterpreted as UTF-16LE bytes with no allocation.</param>
+    /// <summary>
+    /// Writes (or overwrites) a credential holding a plaintext password.
+    /// </summary>
+    /// <param name="target">The name to store and look the credential up under.</param>
+    /// <param name="password">The password, reinterpreted as UTF-16LE bytes with no allocation.</param>
     /// <param name="type"><see cref="CredentialType.DomainCertificate"/>/<see cref="CredentialType.GenericCertificate"/> are rejected by the OS; this just returns <see langword="false"/> for them.</param>
-    /// <param name="userName">Optional.</param>
-    /// <param name="comment">Optional.</param>
-    /// <param name="attributes">Max <see cref="MaxAttributeCount"/> entries.</param>
+    /// <param name="userName">The associated username, if any.</param>
+    /// <param name="comment">A free-text comment, if any.</param>
+    /// <param name="persistence"></param>
+    /// <param name="attributes">Application-defined key/value pairs to attach, up to <see cref="MaxAttributeCount"/> entries.</param>
     /// <returns><see langword="true"/> if written.</returns>
     public static bool TryWrite(string target, ReadOnlySpan<char> password, CredentialType type = CredentialType.Generic, string userName = null, string comment = null, CredentialPersistence persistence = CredentialPersistence.LocalMachine, ReadOnlySpan<CredentialAttributeEntry> attributes = default)
         => TryWrite(target, MemoryMarshal.AsBytes(password), type, userName, comment, persistence, attributes);
 
-    /// <summary>Reads a credential. The returned <see cref="CredentialReader"/> must be disposed.</summary>
-    /// <param name="reader">Zero-copy view, valid until disposed.</param>
+    /// <summary>
+    /// Reads a credential. The returned <see cref="CredentialReader"/> must be disposed.
+    /// </summary>
+    /// <param name="target">The name the credential was stored under.</param>
+    /// <param name="reader">A zero-copy view over the credential, valid until disposed.</param>
+    /// <param name="type">The credential type to look up.</param>
     /// <returns><see langword="true"/> if found.</returns>
     public static bool TryRead(string target, out CredentialReader reader, CredentialType type = CredentialType.Generic)
     {
@@ -158,7 +178,11 @@ public static unsafe class CredentialStore
         return false;
     }
 
-    /// <summary>Deletes a credential.</summary>
+    /// <summary>
+    /// Deletes a credential.
+    /// </summary>
+    /// <param name="target">The name the credential was stored under.</param>
+    /// <param name="type">The credential type to delete.</param>
     /// <returns><see langword="true"/> if deleted.</returns>
     public static bool Delete(string target, CredentialType type = CredentialType.Generic)
     {
@@ -173,8 +197,12 @@ public static unsafe class CredentialStore
         }
     }
 
-    /// <summary>Renames via read + delete + rewrite (Windows has no atomic rename); not transactional.</summary>
-    /// <param name="newTarget">Must not be null or empty.</param>
+    /// <summary>
+    /// Renames via read + delete + rewrite (Windows has no atomic rename); not transactional.
+    /// </summary>
+    /// <param name="oldTarget">The credential's current target name.</param>
+    /// <param name="newTarget">The target name to move it to.</param>
+    /// <param name="type">The credential type.</param>
     /// <returns><see langword="true"/> if the credential existed and was moved.</returns>
     public static bool TryRename(string oldTarget, string newTarget, CredentialType type = CredentialType.Generic)
     {
@@ -203,15 +231,13 @@ public static unsafe class CredentialStore
                 attributes[i] = new CredentialAttributeEntry(attribute.Keyword.ToString(), attribute.Value.ToArray());
             }
 
-            if (!Delete(oldTarget, type))
-            {
-                return false;
-            }
-            return TryWrite(newTarget, secret, type, userName, comment, persistence, attributes);
+            return Delete(oldTarget, type) && TryWrite(newTarget, secret, type, userName, comment, persistence, attributes);
         }
     }
 
-    /// <summary>Enumerates credentials. The returned <see cref="CredentialEnumerator"/> must be disposed.</summary>
+    /// <summary>
+    /// Enumerates credentials. The returned <see cref="CredentialEnumerator"/> must be disposed.
+    /// </summary>
     /// <param name="enumerator">Zero-copy view over matches, valid until disposed.</param>
     /// <param name="filter">Target name filter, one trailing wildcard only (e.g. <c>"myapp*"</c>). Null enumerates all of the current user's.</param>
     /// <param name="allCredentials">Include otherwise-excluded credentials; only applies when <paramref name="filter"/> is null.</param>
