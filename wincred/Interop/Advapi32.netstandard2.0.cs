@@ -15,7 +15,7 @@ internal static unsafe class Advapi32
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool CredDeleteW(char* target, uint type, uint flags);
 
-    [DllImport("Advapi32.dll", ExactSpelling = true, SetLastError = true)]
+    [DllImport("Advapi32.dll", ExactSpelling = true)]
     internal static extern void CredFree(nint buffer);
 
     [DllImport("Advapi32.dll", ExactSpelling = true, SetLastError = true, CharSet = CharSet.Unicode)]

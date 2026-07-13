@@ -19,6 +19,9 @@ public unsafe ref struct CredentialReader : IDisposable
         _owned = owned;
     }
 
+    // raw record, for in-place rewrites that must preserve fields not surfaced here (Flags, TargetAlias)
+    internal readonly NativeCredential* Raw => _credential;
+
     /// <summary>
     /// The decrypted secret blob.
     /// </summary>
@@ -29,7 +32,7 @@ public unsafe ref struct CredentialReader : IDisposable
     }
 
     /// <summary>
-    /// Secret as UTF-16LE text (a plaintext password). Throws <see cref="FormatException"/> if not well-formed UTF-16; use <see cref="UnsafePassword"/> to skip that check.
+    /// Secret as UTF-16LE text (a plaintext password), with one trailing null terminator dropped if present (foreign writers such as <c>cmdkey</c> include it in the blob). Throws <see cref="FormatException"/> if not well-formed UTF-16; use <see cref="UnsafePassword"/> to skip both the check and the trim.
     /// </summary>
     public readonly ReadOnlySpan<char> Password
     {
@@ -43,6 +46,11 @@ public unsafe ref struct CredentialReader : IDisposable
             }
 
             var chars = MemoryMarshal.Cast<byte, char>(secret);
+            // foreign writers conventionally store the UTF-16 terminator inside the blob; our own TryWrite does not
+            if (!chars.IsEmpty && chars[chars.Length - 1] == '\0')
+            {
+                chars = chars.Slice(0, chars.Length - 1);
+            }
             if (!IsWellFormedUtf16(chars))
             {
                 ThrowHelpers.ThrowInvalidUtf16Secret();
@@ -53,7 +61,7 @@ public unsafe ref struct CredentialReader : IDisposable
     }
 
     /// <summary>
-    /// Secret as UTF-16LE text, unchecked. UB if the secret isn't valid UTF-16.
+    /// Secret as UTF-16LE text, unchecked and untrimmed (a trailing terminator, if the blob has one, is included). UB if the secret isn't valid UTF-16.
     /// </summary>
     public readonly ReadOnlySpan<char> UnsafePassword
     {

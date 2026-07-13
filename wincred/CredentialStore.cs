@@ -1,3 +1,5 @@
+using System.Buffers;
+
 using wincred.Interop;
 
 namespace wincred;
@@ -61,39 +63,45 @@ public static unsafe class CredentialStore
         }
         for (var i = 0; i < attributes.Length; i++)
         {
-            if (attributes[i].Keyword is { Length: > MaxAttributeKeywordLength })
+            var keyword = attributes[i].Keyword;
+            if (keyword is null)
             {
-                ThrowHelpers.ThrowAttributeKeywordTooLong(attributes[i].Keyword);
+                ThrowHelpers.ThrowNullAttributeKeyword();
             }
-            if (attributes[i].Value is { Length: > MaxAttributeValueSize })
+            if (keyword.Length > MaxAttributeKeywordLength)
+            {
+                ThrowHelpers.ThrowAttributeKeywordTooLong(keyword);
+            }
+            if (attributes[i].Value.Length > MaxAttributeValueSize)
             {
                 ThrowHelpers.ThrowAttributeValueTooLarge(attributes[i].Value.Length);
             }
         }
 
-        // dynamic count -> can't `fixed` these, so GCHandle.Alloc per entry instead, freed in `finally`
         var attributeCount = attributes.Length;
 
         Span<NativeCredentialAttribute> natives = stackalloc NativeCredentialAttribute[attributeCount];
 
-        // GCHandle is blittable (one IntPtr), so stackalloc; bounded by MaxAttributeCount (64)
+        // keyword is a string -> GCHandle-pinnable; blittable (one IntPtr), so stackalloc, bounded by MaxAttributeCount (64)
         Span<GCHandle> keywordHandles = stackalloc GCHandle[attributeCount];
-        Span<GCHandle> valueHandles = stackalloc GCHandle[attributeCount];
+        // MemoryHandle holds a managed ref, so it can't live in a stackalloc'd span; heap-alloc only when there are attributes
+        var valueHandles = attributeCount == 0 ? null : new MemoryHandle[attributeCount];
         try
         {
             for (var i = 0; i < attributeCount; i++)
             {
                 var entry = attributes[i];
-                var value = entry.Value ?? [];
 
                 keywordHandles[i] = GCHandle.Alloc(entry.Keyword, GCHandleType.Pinned);
                 natives[i].Keyword = (char*)keywordHandles[i].AddrOfPinnedObject();
                 natives[i].Flags = 0;
+
+                var value = entry.Value;
                 natives[i].ValueSize = (uint)value.Length;
-                if (value.Length > 0)
+                if (!value.IsEmpty)
                 {
-                    valueHandles[i] = GCHandle.Alloc(value, GCHandleType.Pinned);
-                    natives[i].Value = (byte*)valueHandles[i].AddrOfPinnedObject();
+                    valueHandles[i] = value.Pin();
+                    natives[i].Value = (byte*)valueHandles[i].Pointer;
                 }
             }
 
@@ -109,7 +117,7 @@ public static unsafe class CredentialStore
                     TargetName = t,
                     Comment = c,
                     CredentialBlobSize = (uint)secret.Length,
-                    CredentialBlob = secret.IsEmpty ? null : s,
+                    CredentialBlob = s, // `fixed` over an empty span already yields null
                     Persist = (uint)persistence,
                     UserName = u,
                     AttributeCount = (uint)attributeCount,
@@ -127,11 +135,11 @@ public static unsafe class CredentialStore
                     handle.Free();
                 }
             }
-            foreach (var handle in valueHandles)
+            if (valueHandles is not null)
             {
-                if (handle.IsAllocated)
+                foreach (var handle in valueHandles)
                 {
-                    handle.Free();
+                    handle.Dispose(); // default MemoryHandle.Dispose is a no-op
                 }
             }
         }
@@ -198,7 +206,8 @@ public static unsafe class CredentialStore
     }
 
     /// <summary>
-    /// Renames via read + delete + rewrite (Windows has no atomic rename); not transactional.
+    /// Renames via write-new-then-delete-old (Windows has no atomic rename); not transactional. A failure after the new
+    /// name is written degrades to a duplicate, never to data loss.
     /// </summary>
     /// <param name="oldTarget">The credential's current target name.</param>
     /// <param name="newTarget">The target name to move it to.</param>
@@ -217,21 +226,24 @@ public static unsafe class CredentialStore
 
         using (reader)
         {
-            // copy out now: reader frees its buffer at scope exit
-            var secret = reader.Secret.ToArray();
-            var userName = reader.UserName.IsEmpty ? null : reader.UserName.ToString();
-            var comment = reader.Comment.IsEmpty ? null : reader.Comment.ToString();
-            var persistence = reader.Persistence;
-
-            var attributeList = reader.Attributes;
-            var attributes = attributeList.Count == 0 ? [] : new CredentialAttributeEntry[attributeList.Count];
-            for (var i = 0; i < attributeList.Count; i++)
+            // copy the whole native record and swap only the target name: preserves Flags/TargetAlias/blob verbatim and
+            // never lands the plaintext secret on the managed heap. Backing buffers stay valid until `reader` is disposed.
+            fixed (char* nt = newTarget)
             {
-                var attribute = attributeList[i];
-                attributes[i] = new CredentialAttributeEntry(attribute.Keyword.ToString(), attribute.Value.ToArray());
+                var native = *reader.Raw;
+                native.TargetName = nt;
+                if (!Advapi32.CredWriteW(&native, 0))
+                {
+                    return false;
+                }
             }
 
-            return Delete(oldTarget, type) && TryWrite(newTarget, secret, type, userName, comment, persistence, attributes);
+            // new name is written; drop the old entry unless it's the same key (case-insensitive), which the write just overwrote
+            if (!string.Equals(oldTarget, newTarget, StringComparison.OrdinalIgnoreCase))
+            {
+                Delete(oldTarget, type);
+            }
+            return true;
         }
     }
 

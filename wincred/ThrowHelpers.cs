@@ -29,6 +29,9 @@ internal static class ThrowHelpers
     internal static void ThrowTooManyAttributes(int count) => throw new ArgumentOutOfRangeException("attributes", count, TooManyAttributesMessage);
     [MethodImpl(MethodImplOptions.NoInlining)]
     [DoesNotReturn]
+    internal static void ThrowNullAttributeKeyword() => throw new ArgumentException("An attribute keyword must not be null.", "attributes");
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    [DoesNotReturn]
     internal static void ThrowAttributeKeywordTooLong(string keyword) => throw new ArgumentOutOfRangeException("attributes", keyword, AttributeKeywordTooLongMessage);
     [MethodImpl(MethodImplOptions.NoInlining)]
     [DoesNotReturn]
@@ -39,6 +42,6 @@ internal static class ThrowHelpers
 }
 
 #if NETSTANDARD2_0
-// polyfill, avoids #if per throw helper
+// inert polyfill, avoids #if per throw helper
 internal class DoesNotReturnAttribute : Attribute { }
 #endif
