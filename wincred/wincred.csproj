@@ -2,10 +2,9 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFrameworks>netstandard2.0;net7.0-windows</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net7.0-windows;net8.0-windows</TargetFrameworks>
     <TargetPlatformIdentifier>windows</TargetPlatformIdentifier>
 
-    <RollForward>LatestMajor</RollForward>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
@@ -27,12 +26,11 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <IncludeSymbols>True</IncludeSymbols>
-    <IsAotCompatible>true</IsAotCompatible>
     <Version>0.1.0</Version>
 
     <PackageId>$(AssemblyName)</PackageId>
     <PackageVersion>$(Version)</PackageVersion>
-    <PackageDescription></PackageDescription>
+    <PackageDescription>Low-alloc interaction with the Windows Credential Manager.</PackageDescription>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -55,10 +53,14 @@
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
       <Compile Remove="**/*.net7.0.cs" />
       <None Include="**/*.net7.0.cs" />
+      <PackageReference Include="System.Memory" Version="4.6.3" />
   </ItemGroup>
-  <ItemGroup Condition="'$(TargetFramework)' == 'net7.0-windows'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net7.0-windows' OR '$(TargetFramework)' == 'net8.0-windows'">
       <Compile Remove="**/*.netstandard2.0.cs" />
       <None Include="**/*.netstandard2.0.cs" />
   </ItemGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">
+      <IsAotCompatible>True</IsAotCompatible>
+  </PropertyGroup>
 
 </Project>
