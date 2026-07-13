@@ -1,6 +1,4 @@
-﻿using System.Net;
-
-namespace wincred.Interop;
+﻿namespace wincred.Interop;
 
 internal static unsafe partial class Advapi32
 {
