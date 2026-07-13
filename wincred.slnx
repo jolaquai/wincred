@@ -4,5 +4,6 @@
     <File Path="LICENSE" />
     <File Path="README.md" />
   </Folder>
+  <Project Path="Examples/Examples.csproj" />
   <Project Path="wincred/wincred.csproj" />
 </Solution>
